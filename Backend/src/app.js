@@ -8,7 +8,7 @@ app.use(cookieparser());
 
 app.use(express.json());
 app.use(cors({
-    origin:["http://localhost:5173","http://localhost:5174","http://genai-resume-report-generator-dnxxayyl1.vercel.app"],
+    origin:["https://genai-resume-report-generator-dnxxayyl1.vercel.app"],
     methods:[ 'GET', 'POST','PUT', 'DELETE'],
     credentials:true
 }))
