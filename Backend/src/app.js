@@ -8,7 +8,7 @@ app.use(cookieparser());
 
 app.use(express.json());
 app.use(cors({
-    origin:"http://localhost:5173",
+    origin:["http://localhost:5173","http://localhost:5174","http://genai-resume-report-generator.onrender.com"],
     credentials:true
 }))
 
