@@ -5,7 +5,7 @@ const tokenBlacklistModel = require("../models/blacklist.model")
      const token = req.cookies.token 
 
      if(!token){
-        return res.status(404).json({
+        return res.status(401).json({
             message:"token not provided"
         })
      }
