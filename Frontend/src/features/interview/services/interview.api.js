@@ -1,9 +1,10 @@
 import axios from "axios";
 // import { jobDescription, selfDescription } from "../../../../../Backend/src/services/temp";
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://genai-resume-report-generator.onrender.com" : "http://localhost:3000")).replace(/\/$/, "")
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "https://genai-resume-report-generator.onrender.com" : "http://localhost:3000"),
+    baseURL: API_BASE_URL,
     withCredentials: true,
 })
 
