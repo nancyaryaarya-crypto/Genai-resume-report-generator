@@ -121,6 +121,100 @@ function escapePdfText(value = "") {
         .replace(/\n/g, " ")
 }
 
+function normalizeResumeHtmlForPdf(htmlContent = "") {
+    const rawHtml = String(htmlContent || "").trim()
+
+    const cleanedHtml = rawHtml
+        .replace(/^<!doctype html[^>]*>/i, "")
+        .replace(/^<html[^>]*>/i, "")
+        .replace(/<\/html>$/i, "")
+        .replace(/^<body[^>]*>/i, "")
+        .replace(/<\/body>$/i, "")
+        .replace(/^<head[^>]*>[\s\S]*?<\/head>/i, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .trim()
+
+    const innerContent = cleanedHtml
+        .replace(/^<div class="resume-page"[^>]*>/i, "")
+        .replace(/<\/div>$/i, "")
+        .trim()
+
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 794px !important;
+      max-width: 794px !important;
+      min-width: 794px !important;
+      margin: 0 !important;
+      padding: 20px !important;
+      background: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #222222;
+      line-height: 1.3;
+      overflow: visible !important;
+      display: block !important;
+    }
+    .resume-page {
+      width: 794px !important;
+      max-width: 794px !important;
+      min-width: 794px !important;
+      min-height: 1123px !important;
+      margin: 0 auto;
+      padding: 20px;
+      background: #ffffff;
+      display: block !important;
+      overflow: visible !important;
+      box-shadow: none !important;
+      position: static !important;
+      transform: none !important;
+    }
+    .resume-page, .resume-container, .container, div, section, article, main, header, footer, ul, li, p, h1, h2, h3, span {
+      max-width: 794px !important;
+      overflow: visible !important;
+      position: static !important;
+      transform: none !important;
+      flex-shrink: 0 !important;
+    }
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    @media print {
+      html, body {
+        width: 794px !important;
+        max-width: 794px !important;
+        min-width: 794px !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        background: #fff !important;
+        overflow: visible !important;
+      }
+      .resume-page {
+        width: 794px !important;
+        max-width: 794px !important;
+        min-width: 794px !important;
+        min-height: 1123px !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="resume-page">
+    ${innerContent}
+  </div>
+</body>
+</html>`
+}
+
 function generateFallbackPdf(text = "") {
     const cleanedText = String(text || "")
         .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -198,7 +292,9 @@ async function generatePDFFromHtml(htmlContent){
 
         await page.emulateMediaType("print")
 
-        await page.setContent(htmlContent || "", {
+        const normalizedHtml = normalizeResumeHtmlForPdf(htmlContent)
+
+        await page.setContent(normalizedHtml, {
             waitUntil: ["load", "domcontentloaded", "networkidle0"],
             timeout: 120000
         })
