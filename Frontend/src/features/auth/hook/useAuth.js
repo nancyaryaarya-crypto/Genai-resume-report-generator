@@ -13,9 +13,13 @@ export const useAuth = ()=>
             setLoading(true)
             try{
                  const data =await login({email,password})
-                 setUser(data.user)
+                 if (data?.user) {
+                    setUser(data.user)
+                 }
+                 return data
             }catch(err){
-
+                console.log(err)
+                return null
             }finally{
                  setLoading(false)
 
@@ -29,10 +33,14 @@ export const useAuth = ()=>
 
             try{
                 const data = await register({ username,email,password})
-                setUser(data.user)
+                if (data?.user) {
+                    setUser(data.user)
+                }
+                return data
 
             }catch(err){
                 console.log(err)
+                return null
             }finally {
                 setLoading(false)
 

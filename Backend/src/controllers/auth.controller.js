@@ -3,13 +3,21 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const tokenBlacklistModel = require('../models/blacklist.model')
 
-const getCookieOptions = () => ({
-    httpOnly: true,
-    path: '/',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000
-})
+const getCookieOptions = (req) => {
+    const isSecureRequest =
+        req.secure ||
+        req.headers['x-forwarded-proto'] === 'https' ||
+        process.env.NODE_ENV === 'production' ||
+        process.env.RENDER === 'true';
+
+    return {
+        httpOnly: true,
+        path: '/',
+        sameSite: isSecureRequest ? 'none' : 'lax',
+        secure: isSecureRequest,
+        maxAge: 24 * 60 * 60 * 1000
+    }
+}
 
 /**
  * @name registerUserController
@@ -56,7 +64,7 @@ async function registerUserController(req,res){
 
     )
 
-    res.cookie("token", token, getCookieOptions())
+    res.cookie("token", token, getCookieOptions(req))
 
     res.status(201).json({
         message:"user registered successfully",
@@ -104,7 +112,7 @@ async function loginUserController(req,res) {
 
     )
 
-    res.cookie("token", token, getCookieOptions())
+    res.cookie("token", token, getCookieOptions(req))
     res.status(200).json({
         message:"user logged in successfully",
         user:{
@@ -124,7 +132,7 @@ async function loginUserController(req,res) {
 
 async function logoutUserController(req,res){
     const token = req.cookies.token
-    const cookieOptions = getCookieOptions()
+    const cookieOptions = getCookieOptions(req)
 
     if(token){
         await tokenBlacklistModel.create({token})

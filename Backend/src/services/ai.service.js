@@ -5,8 +5,14 @@ const { selfDescription, jobDescription } = require("./temp");
 const puppeteer = require("puppeteer")
 
 const ai = new GoogleGenAI({
-    apiKey:process.env.GOOGLE_GENAI_API_KEY
+    apiKey: process.env.GOOGLE_GENAI_API_KEY || ""
 });
+
+function requireGeminiApiKey() {
+    if (!process.env.GOOGLE_GENAI_API_KEY) {
+        throw new Error("GOOGLE_GENAI_API_KEY is not configured in the backend environment.")
+    }
+}
 
 const interviewReportSchema = {
     type: "OBJECT",
@@ -80,6 +86,7 @@ const interviewReportSchema = {
 
 
 async function generateInterviewReport ({resume,selfDescription,jobDescription}){
+    requireGeminiApiKey()
 
     const prompt = `Generate a detailed candidate interview report strictly matching the requested JSON schema. 
     Analyze the following inputs:
@@ -136,6 +143,8 @@ async function generatePDFFromHtml(htmlContent){
 
 
 async function generateResumePdf({resume, selfDescription, jobDescription}) {
+     requireGeminiApiKey()
+
      const resumePdfSchema = z.object({
         html: z.string().describe("The HTML content of the resume which can be converted to PDF using any libary like puppeteer")
      })

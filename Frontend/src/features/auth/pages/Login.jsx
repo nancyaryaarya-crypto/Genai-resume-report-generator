@@ -13,10 +13,13 @@ const Login =() => {
     const [email,setEmail] = useState("")
     const[password,setPassword] = useState("")
 
-    const handlesubmit = (e) => {
+    const handlesubmit = async (e) => {
         e.preventDefault()
-        handleLogin({email,password})
-        navigate ('/')
+        const data = await handleLogin({email,password})
+
+        if (data?.user) {
+            navigate('/')
+        }
     }
 
     if(loading){
