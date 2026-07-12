@@ -149,6 +149,27 @@ function getCleanLines(value = "", maxItems = 8) {
         .slice(0, maxItems)
 }
 
+function buildStableResumeText({ resume = "", selfDescription = "", jobDescription = "" }) {
+    const profileLines = getCleanLines(selfDescription, 8)
+    const resumeLines = getCleanLines(resume, 12)
+    const roleLines = getCleanLines(jobDescription, 8)
+
+    const lines = [
+        "Resume Snapshot",
+        "",
+        "Profile Summary",
+        ...profileLines,
+        "",
+        "Target Role",
+        ...roleLines,
+        "",
+        "Resume Highlights",
+        ...resumeLines
+    ]
+
+    return lines.join("\n")
+}
+
 function buildStableResumeHtml({ resume = "", selfDescription = "", jobDescription = "" }) {
     const profileLines = getCleanLines(selfDescription, 6)
     const resumeLines = getCleanLines(resume, 8)
@@ -494,8 +515,8 @@ async function generatePDFFromHtml(htmlContent){
 
 
 async function generateResumePdf({resume, selfDescription, jobDescription}) {
-    const stableHtml = buildStableResumeHtml({ resume, selfDescription, jobDescription })
-    const pdfBuffer = await generatePDFFromHtml(stableHtml)
+    const stableText = buildStableResumeText({ resume, selfDescription, jobDescription })
+    const pdfBuffer = generateFallbackPdf(stableText)
 
     return pdfBuffer
 }

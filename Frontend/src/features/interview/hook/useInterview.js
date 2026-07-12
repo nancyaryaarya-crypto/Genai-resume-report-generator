@@ -77,14 +77,17 @@ export const useInterview = () => {
 
         try {
             const response = await generateResumePdf({ interviewReportId })
-            const url = window.URL.createObjectURL(new Blob([response], { type: "application/pdf" }))
+            const blob = response instanceof Blob ? response : new Blob([response], { type: "application/pdf" })
+            const url = window.URL.createObjectURL(blob)
             const link = document.createElement("a")
             link.href = url
             link.setAttribute("download", `resume_${interviewReportId}.pdf`)
             document.body.appendChild(link)
             link.click()
-            link.remove()
-            window.URL.revokeObjectURL(url)
+            setTimeout(() => {
+                link.remove()
+                window.URL.revokeObjectURL(url)
+            }, 1000)
             return true
         } catch (error) {
             console.error(error)
