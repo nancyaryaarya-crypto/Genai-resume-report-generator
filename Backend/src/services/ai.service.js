@@ -209,10 +209,25 @@ async function generatePDFFromHtml(htmlContent){
             if (document.fonts?.ready) {
                 await document.fonts.ready
             }
+
+            document.documentElement.style.width = '794px'
+            document.documentElement.style.maxWidth = '794px'
+            document.documentElement.style.minWidth = '794px'
+            document.documentElement.style.overflow = 'visible'
+            document.body.style.width = '794px'
+            document.body.style.maxWidth = '794px'
+            document.body.style.minWidth = '794px'
+            document.body.style.display = 'block'
+            document.body.style.margin = '0'
+            document.body.style.padding = '20px'
+            document.body.style.boxSizing = 'border-box'
+            document.body.style.overflow = 'visible'
+            document.body.style.transform = 'none'
+            document.body.style.zoom = '1'
         })
 
         await page.addStyleTag({
-            content: 'body, html { width: 794px !important; max-width: 794px !important; min-width: 794px !important; display: block !important; margin: 0; padding: 20px; box-sizing: border-box; } .container, div { max-width: 100% !important; flex-shrink: 0 !important; }'
+            content: 'html, body { width: 794px !important; max-width: 794px !important; min-width: 794px !important; overflow: visible !important; display: block !important; margin: 0 !important; padding: 20px !important; box-sizing: border-box !important; } html, body, .resume-page, .resume-container, .container, div, section, article, main, header, footer, ul, li, p, h1, h2, h3, span { max-width: 794px !important; flex-shrink: 0 !important; overflow: visible !important; position: static !important; transform: none !important; } * { box-sizing: border-box !important; }'
         })
 
         const pdfBuffer = await page.pdf({
@@ -257,34 +272,33 @@ async function generateResumePdf({resume, selfDescription, jobDescription}) {
                         Job Description:${jobDescription}
 
 
-                        The response must be a valid JSON object with a single field "html" (or "HTML") containing a highly polished, recruiter-grade HTML resume string optimized to fit perfectly on a single A4 page.
+                        The response must be a valid JSON object with a single field "html" (or "HTML") containing a plain HTML resume string optimized to fit on one A4 page with no layout collapse.
 
-                       Apply these exact presentation, print-safe, and strict tight spacing structures using an embedded <style> tag:
+                        CRITICAL OUTPUT RULES:
+                        - Return only a raw HTML string with an embedded <style> block.
+                        - Do NOT use Tailwind classes, external CSS, external fonts, or JavaScript.
+                        - Do NOT use CSS grid, CSS zoom, transforms, or absolute positioning.
+                        - Do NOT use nested flex layouts or huge width values.
+                        - Use a single top-level wrapper like <div class="resume-page">.
+                        - Use only simple block-level HTML sections with semantic tags like <div>, <section>, <p>, <ul>, <li>, <h1>, <h2>.
 
-                       1. *Global Reset & Print Safety (To fit on 1 Page):*
-                          - Reset margins: * { margin: 0; padding: 0; box-sizing: border-box; }
-                          - Body configuration: font-family: 'Arial', 'Helvetica', sans-serif; color: #222222; line-height: 1.3; background: #ffffff; padding: 0; width: 100%;
-                          - Use a single top-level wrapper like <div class="resume-page"> that is width: 210mm; min-height: 297mm; margin: 0 auto; padding: 12mm; background: #ffffff; display: block !important; box-shadow: none; overflow: visible;
-                          - Add @page { size: A4; margin: 0; }
-                          - Add @media print { html, body { margin: 0; padding: 0; background: #fff; } .resume-page { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 12mm !important; display: block !important; box-shadow: none !important; overflow: visible !important; } * { box-sizing: border-box !important; } .row, .row-inline, .two-col, .summary-grid, .skills-list, .entry-top { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch !important; } .col, .left, .right, .project-card, .section, .summary-item { display: block !important; width: 100% !important; min-width: 0 !important; } }
+                        Apply these exact print-safe styles inside the <style> tag:
 
-                      2. *Compact Section Spacing:*
-                         - Every major section wrapper must have margin-bottom: 10px; (Strictly no huge structural gaps).
-                         - Headings (<h2>): font-size: 11pt; font-weight: bold; color: #1a365d; text-transform: uppercase; border-bottom: 1px solid #1a365d; padding-bottom: 2px; margin-top: 10px; margin-bottom: 5px;
-                         - Avoid floats, absolute positioning, weird transforms, and large hidden overflow containers.
-                         - Set page-break-inside: avoid and break-inside: avoid on each section card, project block, and bullet list.
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        @page { size: A4; margin: 0; }
+                        html, body { margin: 0; padding: 0; background: #ffffff; font-family: Arial, Helvetica, sans-serif; color: #222222; line-height: 1.3; overflow: visible; }
+                        body { width: 794px; max-width: 794px; min-width: 794px; display: block; }
+                        .resume-page { width: 794px; max-width: 794px; min-width: 794px; min-height: 1123px; margin: 0 auto; padding: 20px; background: #ffffff; display: block !important; box-shadow: none; overflow: visible; }
+                        .section, .entry, .summary-item, .project-card, .skills-list, .row, .entry-top { display: block !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+                        @media print { html, body { margin: 0; padding: 0; background: #fff; } .resume-page { width: 794px !important; max-width: 794px !important; min-width: 794px !important; min-height: 1123px !important; margin: 0 !important; padding: 20px !important; display: block !important; box-shadow: none !important; overflow: visible !important; } * { box-sizing: border-box !important; } }
 
-                     3. *Executive Typography:*
-                        - Name Heading (<h1>): font-size: 20pt; font-weight: bold; text-align: center; margin-bottom: 3px; color: #111111;
-                        - Contact Info Line: font-size: 9pt; color: #555555; text-align: center; margin-bottom: 12px;
-                        - Company/Project headers: Use a clean flex layout to keep Title on left and Date on right. Font size: 9.5pt (bold for titles).
-                        - Paragraphs (<p>) and Bullet Lists (<ul>/<li>): font-size: 9pt; color: #444444; margin-bottom: 2px; line-height: 1.35;
-                        - Bullet Points (<li>): margin-bottom: 2px; padding-left: 3px; list-style-position: inside;
-
-                     4. *Formatting Restrictions:*
-                        - Keep description sentences crisp and short. Do not allow lines to break unnecessarily. Bold only critical technical words naturally inside text.
-                        - Do not use large fixed pixel widths, CSS zoom, or nested flex layouts that can collapse in print.
-                        - Prefer a single-page, block-based layout with narrow section spacing and no content overflow.`
+                        Typography and spacing rules:
+                        - h1: font-size: 20pt; font-weight: bold; text-align: center; margin-bottom: 3px;
+                        - h2: font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #1a365d; padding-bottom: 2px; margin-top: 10px; margin-bottom: 5px;
+                        - p, li: font-size: 9pt; line-height: 1.35; margin-bottom: 2px;
+                        - Keep all content concise and fit on one page without overflow or horizontal collapse.
+                        - Use short, clean sentences and avoid wide tables, huge lists, or multi-column layout.
+                        - Each section should be block-based and should not rely on flexbox to stay stable in print.`
                         
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
