@@ -95,10 +95,7 @@ async function generateInterviewReport ({resume,selfDescription,jobDescription})
     - Target Job Description: ${jobDescription}`;
 
     
-    // const prompt = `generate an interview report for a candidate with the following details:
-    //                     resume:${resume}
-    //                     self describe:${selfDescription}
-    //                     job describen:${jobDescription}`
+  
     
     
     const response = await ai.models.generateContent({
@@ -109,14 +106,7 @@ async function generateInterviewReport ({resume,selfDescription,jobDescription})
         responseSchema: interviewReportSchema // Use the custom uppercase schema here directly
     }
     });
-    // const response = await ai.models.generateContent({
-    //     model:"gemini-2.5-flash",
-    //     contents:prompt,
-    //     config:{
-    //         responseMimeType:"application/json",
-    //         responsejsonSchema: zodToJsonSchema(interviewReportSchema)
-    //     }
-    // })
+  
 
     return JSON.parse(response.text)
 }
@@ -199,17 +189,39 @@ async function generatePDFFromHtml(htmlContent){
     try {
         browser = await puppeteer.launch(launchOptions)
         const page = await browser.newPage()
-        await page.setContent(htmlContent || "", { waitUntil: "networkidle0" })
+
+        await page.setViewport({
+            width: 1240,
+            height: 1754,
+            deviceScaleFactor: 1
+        })
+
+        await page.emulateMediaType("print")
+
+        await page.setContent(htmlContent || "", {
+            waitUntil: ["load", "domcontentloaded", "networkidle0"],
+            timeout: 120000
+        })
+
+        await page.evaluate(async () => {
+            if (document.fonts?.ready) {
+                await document.fonts.ready
+            }
+        })
 
         const pdfBuffer = await page.pdf({
             format: "A4",
+            width: "210mm",
+            height: "297mm",
             printBackground: true,
-            preferCSSPageSize: true,
+            preferCSSPageSize: false,
+            scale: 1,
+            displayHeaderFooter: false,
             margin: {
-                top: "20mm",
-                bottom: "20mm",
-                left: "15mm",
-                right: "15mm"
+                top: "0mm",
+                bottom: "0mm",
+                left: "0mm",
+                right: "0mm"
             }
         })
 
@@ -242,16 +254,20 @@ async function generateResumePdf({resume, selfDescription, jobDescription}) {
 
                         The response must be a valid JSON object with a single field "html" (or "HTML") containing a highly polished, recruiter-grade HTML resume string optimized to fit perfectly on a single A4 page.
 
-                       Apply these exact presentation, font, and strict tight spacing structures using an embedded <style> tag:
+                       Apply these exact presentation, print-safe, and strict tight spacing structures using an embedded <style> tag:
 
-                       1. *Global Reset & Tight Constraints (To fit on 1 Page):*
+                       1. *Global Reset & Print Safety (To fit on 1 Page):*
                           - Reset margins: * { margin: 0; padding: 0; box-sizing: border-box; }
-                          - Body configuration: font-family: 'Arial', 'Helvetica', sans-serif; color: #222222; line-height: 1.3; background: #ffffff; padding: 15px 20px;
-                          - Container bound: max-width: 750px; margin: 0 auto;
+                          - Body configuration: font-family: 'Arial', 'Helvetica', sans-serif; color: #222222; line-height: 1.3; background: #ffffff; padding: 0; width: 100%;
+                          - Use a single top-level wrapper like <div class="resume-page"> that is width: 210mm; min-height: 297mm; margin: 0 auto; padding: 12mm; background: #ffffff; display: block !important; box-shadow: none; overflow: visible;
+                          - Add @page { size: A4; margin: 0; }
+                          - Add @media print { html, body { margin: 0; padding: 0; background: #fff; } .resume-page { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 12mm !important; display: block !important; box-shadow: none !important; overflow: visible !important; } * { box-sizing: border-box !important; } .row, .row-inline, .two-col, .summary-grid, .skills-list, .entry-top { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch !important; } .col, .left, .right, .project-card, .section, .summary-item { display: block !important; width: 100% !important; min-width: 0 !important; } }
 
                       2. *Compact Section Spacing:*
                          - Every major section wrapper must have margin-bottom: 10px; (Strictly no huge structural gaps).
                          - Headings (<h2>): font-size: 11pt; font-weight: bold; color: #1a365d; text-transform: uppercase; border-bottom: 1px solid #1a365d; padding-bottom: 2px; margin-top: 10px; margin-bottom: 5px;
+                         - Avoid floats, absolute positioning, weird transforms, and large hidden overflow containers.
+                         - Set page-break-inside: avoid and break-inside: avoid on each section card, project block, and bullet list.
 
                      3. *Executive Typography:*
                         - Name Heading (<h1>): font-size: 20pt; font-weight: bold; text-align: center; margin-bottom: 3px; color: #111111;
@@ -261,7 +277,9 @@ async function generateResumePdf({resume, selfDescription, jobDescription}) {
                         - Bullet Points (<li>): margin-bottom: 2px; padding-left: 3px; list-style-position: inside;
 
                      4. *Formatting Restrictions:*
-                        - Keep description sentences crisp and short. Do not allow lines to break unnecessarily. Bold only critical technical words naturally inside text.`
+                        - Keep description sentences crisp and short. Do not allow lines to break unnecessarily. Bold only critical technical words naturally inside text.
+                        - Do not use large fixed pixel widths, CSS zoom, or nested flex layouts that can collapse in print.
+                        - Prefer a single-page, block-based layout with narrow section spacing and no content overflow.`
                         
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
