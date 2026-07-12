@@ -4,9 +4,19 @@ const {zodToJsonSchema} = require ("zod-to-json-schema");
 const { selfDescription, jobDescription } = require("./temp");
 const puppeteer = require("puppeteer")
 
-const ai = new GoogleGenAI({
-    apiKey: process.env.GOOGLE_GENAI_API_KEY || ""
-});
+let ai = null;
+
+function getAiClient() {
+    requireGeminiApiKey()
+
+    if (!ai) {
+        ai = new GoogleGenAI({
+            apiKey: process.env.GOOGLE_GENAI_API_KEY
+        });
+    }
+
+    return ai
+}
 
 function requireGeminiApiKey() {
     if (!process.env.GOOGLE_GENAI_API_KEY) {
@@ -98,7 +108,7 @@ async function generateInterviewReport ({resume,selfDescription,jobDescription})
   
     
     
-    const response = await ai.models.generateContent({
+    const response = await getAiClient().models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt,
     config: {
@@ -121,6 +131,133 @@ function escapePdfText(value = "") {
         .replace(/\n/g, " ")
 }
 
+function escapeHtml(value = "") {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+}
+
+function getCleanLines(value = "", maxItems = 8) {
+    return String(value || "")
+        .replace(/\r/g, "")
+        .split(/\n+/)
+        .map((line) => line.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .slice(0, maxItems)
+}
+
+function buildStableResumeHtml({ resume = "", selfDescription = "", jobDescription = "" }) {
+    const profileLines = getCleanLines(selfDescription, 6)
+    const resumeLines = getCleanLines(resume, 8)
+    const roleLines = getCleanLines(jobDescription, 6)
+
+    const profileHtml = profileLines.length
+        ? `<ul>${profileLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+        : `<p>Candidate profile summary not available.</p>`
+
+    const resumeHtml = resumeLines.length
+        ? `<ul>${resumeLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+        : `<p>Resume details not available.</p>`
+
+    const roleHtml = roleLines.length
+        ? `<ul>${roleLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+        : `<p>Job description not available.</p>`
+
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 794px !important;
+      max-width: 794px !important;
+      min-width: 794px !important;
+      margin: 0 !important;
+      padding: 20px !important;
+      background: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #222222;
+      line-height: 1.3;
+      overflow: visible !important;
+      display: block !important;
+    }
+    .resume-page {
+      width: 794px !important;
+      max-width: 794px !important;
+      min-width: 794px !important;
+      min-height: 1123px !important;
+      margin: 0 auto;
+      padding: 20px;
+      background: #ffffff;
+      display: block !important;
+      overflow: visible !important;
+      box-shadow: none !important;
+      position: static !important;
+      transform: none !important;
+    }
+    .resume-page, .resume-container, .container, div, section, article, main, header, footer, ul, li, p, h1, h2, h3, span {
+      max-width: 794px !important;
+      overflow: visible !important;
+      position: static !important;
+      transform: none !important;
+      flex-shrink: 0 !important;
+    }
+    .section { margin-bottom: 12px; }
+    h1 { font-size: 28px; font-weight: bold; margin-bottom: 12px; text-align: center; }
+    h2 { font-size: 14px; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; color: #1a365d; }
+    p, li { font-size: 10px; line-height: 1.35; margin-bottom: 4px; }
+    ul { padding-left: 18px; }
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    @media print {
+      html, body {
+        width: 794px !important;
+        max-width: 794px !important;
+        min-width: 794px !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        background: #fff !important;
+        overflow: visible !important;
+      }
+      .resume-page {
+        width: 794px !important;
+        max-width: 794px !important;
+        min-width: 794px !important;
+        min-height: 1123px !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="resume-page">
+    <h1>Resume Snapshot</h1>
+    <div class="section">
+      <h2>Profile Summary</h2>
+      ${profileHtml}
+    </div>
+    <div class="section">
+      <h2>Target Role</h2>
+      ${roleHtml}
+    </div>
+    <div class="section">
+      <h2>Resume Highlights</h2>
+      ${resumeHtml}
+    </div>
+  </div>
+</body>
+</html>`
+}
+
 function normalizeResumeHtmlForPdf(htmlContent = "") {
     const rawHtml = String(htmlContent || "").trim()
 
@@ -133,6 +270,8 @@ function normalizeResumeHtmlForPdf(htmlContent = "") {
         .replace(/^<head[^>]*>[\s\S]*?<\/head>/i, "")
         .replace(/<style[\s\S]*?<\/style>/gi, "")
         .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/\sstyle="[^"]*"/gi, "")
+        .replace(/\sclass="[^"]*"/gi, "")
         .trim()
 
     const innerContent = cleanedHtml
@@ -341,7 +480,7 @@ async function generatePDFFromHtml(htmlContent){
             }
         })
 
-        return pdfBuffer
+        return Buffer.from(pdfBuffer)
     } catch (error) {
         console.error("Puppeteer PDF generation failed, using fallback PDF renderer:", error.message)
         return generateFallbackPdf(htmlContent)
@@ -355,65 +494,10 @@ async function generatePDFFromHtml(htmlContent){
 
 
 async function generateResumePdf({resume, selfDescription, jobDescription}) {
-     requireGeminiApiKey()
-
-     const resumePdfSchema = z.object({
-        html: z.string().describe("The HTML content of the resume which can be converted to PDF using any libary like puppeteer")
-     })
-
-
-    const prompt = `Generate a resume for a candidate with the following details:
-                        resume:${resume}
-                        Self Description:${selfDescription}
-                        Job Description:${jobDescription}
-
-
-                        The response must be a valid JSON object with a single field "html" (or "HTML") containing a plain HTML resume string optimized to fit on one A4 page with no layout collapse.
-
-                        CRITICAL OUTPUT RULES:
-                        - Return only a raw HTML string with an embedded <style> block.
-                        - Do NOT use Tailwind classes, external CSS, external fonts, or JavaScript.
-                        - Do NOT use CSS grid, CSS zoom, transforms, or absolute positioning.
-                        - Do NOT use nested flex layouts or huge width values.
-                        - Use a single top-level wrapper like <div class="resume-page">.
-                        - Use only simple block-level HTML sections with semantic tags like <div>, <section>, <p>, <ul>, <li>, <h1>, <h2>.
-
-                        Apply these exact print-safe styles inside the <style> tag:
-
-                        * { margin: 0; padding: 0; box-sizing: border-box; }
-                        @page { size: A4; margin: 0; }
-                        html, body { margin: 0; padding: 0; background: #ffffff; font-family: Arial, Helvetica, sans-serif; color: #222222; line-height: 1.3; overflow: visible; }
-                        body { width: 794px; max-width: 794px; min-width: 794px; display: block; }
-                        .resume-page { width: 794px; max-width: 794px; min-width: 794px; min-height: 1123px; margin: 0 auto; padding: 20px; background: #ffffff; display: block !important; box-shadow: none; overflow: visible; }
-                        .section, .entry, .summary-item, .project-card, .skills-list, .row, .entry-top { display: block !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
-                        @media print { html, body { margin: 0; padding: 0; background: #fff; } .resume-page { width: 794px !important; max-width: 794px !important; min-width: 794px !important; min-height: 1123px !important; margin: 0 !important; padding: 20px !important; display: block !important; box-shadow: none !important; overflow: visible !important; } * { box-sizing: border-box !important; } }
-
-                        Typography and spacing rules:
-                        - h1: font-size: 20pt; font-weight: bold; text-align: center; margin-bottom: 3px;
-                        - h2: font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #1a365d; padding-bottom: 2px; margin-top: 10px; margin-bottom: 5px;
-                        - p, li: font-size: 9pt; line-height: 1.35; margin-bottom: 2px;
-                        - Keep all content concise and fit on one page without overflow or horizontal collapse.
-                        - Use short, clean sentences and avoid wide tables, huge lists, or multi-column layout.
-                        - Each section should be block-based and should not rely on flexbox to stay stable in print.`
-                        
-    const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents:prompt,
-
-        config:{
-            responseMimeType: "application/json",
-            responseJsonSchema:zodToJsonSchema( resumePdfSchema)
-        }
-    })
-
-
-
-    const jsonContent = JSON.parse(response.text)
-
-    const pdfBuffer = await generatePDFFromHtml(jsonContent.html || jsonContent.HTML)
+    const stableHtml = buildStableResumeHtml({ resume, selfDescription, jobDescription })
+    const pdfBuffer = await generatePDFFromHtml(stableHtml)
 
     return pdfBuffer
-
 }
    
 
