@@ -122,22 +122,106 @@ async function generateInterviewReport ({resume,selfDescription,jobDescription})
 }
 
 
+function escapePdfText(value = "") {
+    return String(value)
+        .replace(/\\/g, "\\\\")
+        .replace(/\(/g, "\\(")
+        .replace(/\)/g, "\\)")
+        .replace(/\r/g, "")
+        .replace(/\n/g, " ")
+}
+
+function generateFallbackPdf(text = "") {
+    const cleanedText = String(text || "")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/\s+/g, " ")
+        .trim()
+
+    const lines = cleanedText ? cleanedText.split(/\s{2,}/).slice(0, 35) : ["Resume preview unavailable."]
+    const pageWidth = 595.28
+    const pageHeight = 841.89
+
+    const contentLines = lines
+        .map((line, index) => {
+            const safeLine = escapePdfText(line)
+            return `BT /F1 11 Tf 50 ${pageHeight - 60 - index * 16} Td (${safeLine}) Tj ET`
+        })
+        .join("\n")
+
+    const contentBytes = Buffer.byteLength(contentLines, "utf8")
+    const objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>`,
+        `<< /Length ${contentBytes} >>\nstream\n${contentLines}\nendstream`,
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    ]
+
+    let pdf = "%PDF-1.4\n"
+    const offsets = []
+
+    objects.forEach((objectContent, index) => {
+        offsets.push(pdf.length)
+        pdf += `${index + 1} 0 obj\n${objectContent}\nendobj\n`
+    })
+
+    const xrefOffset = pdf.length
+    pdf += `xref\n0 ${objects.length + 1}\n`
+    pdf += "0000000000 65535 f \n"
+
+    offsets.forEach((offset) => {
+        pdf += `${String(offset).padStart(10, "0")} 00000 n \n`
+    })
+
+    pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+
+    return Buffer.from(pdf, "binary")
+}
+
 async function generatePDFFromHtml(htmlContent){
-    const browser = await puppeteer.launch()
-    const page = await browser.newPage()
-    await page.setContent(htmlContent,{waitUntil: "networkidle0"})
+    const launchOptions = {
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+    }
 
-    const pdfBuffer = await page.pdf ({ format:"A4",
-        printBackground:true,
-        preferCSSPageSize:true,
-         margin: {
-         top:"20mm",
-         bottom:"20mm", 
-         left:"15mm", right:"15mm"}})
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH
+    }
 
-    await browser.close()
+    let browser
 
-    return pdfBuffer
+    try {
+        browser = await puppeteer.launch(launchOptions)
+        const page = await browser.newPage()
+        await page.setContent(htmlContent || "", { waitUntil: "networkidle0" })
+
+        const pdfBuffer = await page.pdf({
+            format: "A4",
+            printBackground: true,
+            preferCSSPageSize: true,
+            margin: {
+                top: "20mm",
+                bottom: "20mm",
+                left: "15mm",
+                right: "15mm"
+            }
+        })
+
+        return pdfBuffer
+    } catch (error) {
+        console.error("Puppeteer PDF generation failed, using fallback PDF renderer:", error.message)
+        return generateFallbackPdf(htmlContent)
+    } finally {
+        if (browser) {
+            await browser.close().catch(() => {})
+        }
+    }
 }
 
 
