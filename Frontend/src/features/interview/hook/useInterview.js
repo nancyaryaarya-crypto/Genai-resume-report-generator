@@ -77,7 +77,8 @@ export const useInterview = () => {
 
         try {
             const response = await generateResumePdf({ interviewReportId })
-            const blob = response instanceof Blob ? response : new Blob([response], { type: "application/pdf" })
+            const pdfBytes = response instanceof ArrayBuffer ? response : new Uint8Array(response)
+            const blob = new Blob([pdfBytes], { type: "application/pdf" })
             const url = window.URL.createObjectURL(blob)
             const link = document.createElement("a")
             link.href = url
