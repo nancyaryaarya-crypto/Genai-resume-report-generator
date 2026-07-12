@@ -203,25 +203,30 @@ async function generatePDFFromHtml(htmlContent){
             timeout: 120000
         })
 
+        await page.waitForNetworkIdle({ idleTime: 500 })
+
         await page.evaluate(async () => {
             if (document.fonts?.ready) {
                 await document.fonts.ready
             }
         })
 
+        await page.addStyleTag({
+            content: 'body, html { width: 794px !important; max-width: 794px !important; min-width: 794px !important; display: block !important; margin: 0; padding: 20px; box-sizing: border-box; } .container, div { max-width: 100% !important; flex-shrink: 0 !important; }'
+        })
+
         const pdfBuffer = await page.pdf({
-            format: "A4",
-            width: "210mm",
-            height: "297mm",
             printBackground: true,
+            width: '794px',
+            height: '1123px',
             preferCSSPageSize: false,
             scale: 1,
             displayHeaderFooter: false,
             margin: {
-                top: "0mm",
-                bottom: "0mm",
-                left: "0mm",
-                right: "0mm"
+                top: "0px",
+                bottom: "0px",
+                left: "0px",
+                right: "0px"
             }
         })
 
